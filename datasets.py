@@ -11,14 +11,14 @@ def prepare_mnist():
 
     # load train data
     train_dataset = datasets.MNIST(
-        root='../data',
+        root='/usr/home/sut/datasets',
         train=True,
         transform=transforms.Compose([transforms.ToTensor(), normalize]),
         download=True)
 
     # load test data
     test_dataset = datasets.MNIST(
-        root='../data',
+        root='/usr/home/sut/datasets',
         train=False,
         transform=transforms.Compose([transforms.ToTensor(), normalize]))
 
