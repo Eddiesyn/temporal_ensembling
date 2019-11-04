@@ -5,8 +5,8 @@ from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 from timeit import default_timer as timer
 
-from model import HandyModel
-from datasets import prepare_mnist
+from models.Handymodel import HandyModel
+from datasets.datasets import prepare_mnist
 import utils
 import config
 

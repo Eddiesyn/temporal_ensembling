@@ -4,18 +4,7 @@ import torch
 import torch.nn as nn
 import torchvision
 
-class GaussianNoise(nn.Module):
-    def __init__(self, batch_size, input_shape, std):
-        super(GaussianNoise, self).__init__()
-        self.shape = (batch_size, ) + input_shape
-        self.std = std
-        self.noise = torch.zeros(self.shape).cuda()
-
-    def forward(self, x):
-        self.noise.normal_(mean=0, std=self.std)
-        # print(self.noise.shape)
-
-        return x + self.noise
+from utils import GaussianNoise
 
 class HandyModel(nn.Module):
     def __init__(self, batch_size, std, input_shape=(1, 28, 28), p=0.5, fm1=16, fm2=32):
