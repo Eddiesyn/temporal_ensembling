@@ -4,6 +4,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 from timeit import default_timer as timer
+import torchvision.transforms as transforms
 
 from models.Handymodel import HandyModel
 from datasets.datasets import prepare_mnist
@@ -12,12 +13,14 @@ import config
 
 cfg = vars(config)
 
-def train(model, writer, seed, k=100, alpha=0.6, lr=0.002, num_epochs=150, batch_size=64, n_classes=10, max_epochs=80, max_val=30.):
+
+def train(model, writer, seed, k=100, alpha=0.6, lr=0.002, num_epochs=150, batch_size=64, n_classes=10, max_epochs=80, max_val=1.):
     # prepare data
-    train_dataset, val_dataset = prepare_mnist()
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(cfg['m'], cfg['s'])])
+    train_dataset, val_dataset = prepare_mnist(root='~/datasets/MNIST', transform=transform)
     ntrain = len(train_dataset)
 
-    # build model
+    # build model and feed to GPU
     model.cuda()
 
     # make data loaders
@@ -28,9 +31,9 @@ def train(model, writer, seed, k=100, alpha=0.6, lr=0.002, num_epochs=150, batch
 
     # model.train()
 
-    Z = torch.zeros(ntrain, n_classes).float().cuda() # intermediate values
-    z = torch.zeros(ntrain, n_classes).float().cuda() # temporal outputs
-    outputs = torch.zeros(ntrain, n_classes).float().cuda() # current outputs
+    Z = torch.zeros(ntrain, n_classes).float().cuda()  # intermediate values
+    z = torch.zeros(ntrain, n_classes).float().cuda()  # temporal outputs
+    outputs = torch.zeros(ntrain, n_classes).float().cuda()  # current outputs
 
     losses = []
     suplosses = []
@@ -41,19 +44,21 @@ def train(model, writer, seed, k=100, alpha=0.6, lr=0.002, num_epochs=150, batch
         print('\nEpoch: {}'.format(epoch+1))
         model.train()
         # evaluate unsupervised cost weight
-        w = utils.weight_scheduler(epoch, max_epochs, max_val, -5, k, 60000)
+        w = utils.weight_scheduler(epoch, max_epochs, max_val, 5, k, 60000)
 
         w = torch.tensor(w, requires_grad=False).cuda()
         print('---------------------')
 
+        # targets change only once per epoch
         for i, (images, labels) in enumerate(train_loader):
+            batch_size = images.size(0)  # retrieve batch size again cause drop last is false
             images = images.cuda()
             labels = labels.requires_grad_(False).cuda()
 
             optimizer.zero_grad()
             out = model(images)
             zcomp = z[i * batch_size: (i+1) * batch_size]
-            #zcomp = torch.tensor(zcomp, requires_grad=False)
+            # zcomp = torch.tensor(zcomp, requires_grad=False)
             zcomp.requires_grad_(False)
             loss, suploss, unsuploss, nbsup = utils.temporal_losses(out, zcomp, w, labels)
 
@@ -71,7 +76,6 @@ def train(model, writer, seed, k=100, alpha=0.6, lr=0.002, num_epochs=150, batch
             # if (i + 1) % 100 == 0:
             #     print('Step [%d/%d], Loss: %.6f, Time: %.2f s' % (i+1, len(train_dataset) // batch_size,
             #                                                       float(np.mean(losses)), timer()-t))
-
 
         loss_mean = np.mean(losses)
         supl_mean = np.mean(suplosses)
@@ -102,10 +106,10 @@ def train(model, writer, seed, k=100, alpha=0.6, lr=0.002, num_epochs=150, batch
     acc_best = utils.calc_metrics(model, val_loader)
     print('Acc (best model): %.2f' % acc_best)
 
+
 if __name__ == '__main__':
     for i in range(cfg['n_exp']):
         model = HandyModel(cfg['batch_size'], cfg['std'], fm1=cfg['fm1'], fm2=cfg['fm2'])
         seed = cfg['seeds'][i]
         writer = SummaryWriter('results/exp_{}'.format(i+1))
         train(model, writer, seed)
-
